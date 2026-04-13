@@ -26,7 +26,7 @@ import hashlib
 import datetime
 from functools import wraps
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import (
@@ -36,12 +36,15 @@ from flask_jwt_extended import (
 # ─────────────────────────────────────────────────────────
 # APP SETUP
 # ─────────────────────────────────────────────────────────
-app = Flask(__name__, static_folder=".", template_folder=".")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__,
+            static_folder=os.path.join(BASE_DIR, "static"),
+            template_folder=os.path.join(BASE_DIR, "templates"))
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 app.config["SECRET_KEY"]                      = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 app.config["JWT_SECRET_KEY"]                  = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-me")
-app.config["SQLALCHEMY_DATABASE_URI"]         = os.getenv("DATABASE_URL", "sqlite:///bizcrmdb.db")
+app.config["SQLALCHEMY_DATABASE_URI"]         = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'instance', 'bizcrmdb.db')}")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"]  = False
 app.config["JWT_ACCESS_TOKEN_EXPIRES"]        = datetime.timedelta(hours=12)
 
@@ -197,9 +200,19 @@ def error(msg="Error", code=400):
 # ROUTES — STATIC (serve the HTML frontend)
 # ─────────────────────────────────────────────────────────
 
+TMPL_DIR = os.path.join(BASE_DIR, "templates")
+
 @app.route("/")
 def index():
-    return send_from_directory(".", "index.html")
+    return send_from_directory(TMPL_DIR, "index.html")
+
+@app.route("/login")
+def login_page():
+    return send_from_directory(TMPL_DIR, "login.html")
+
+@app.route("/customer")
+def customer_portal():
+    return send_from_directory(TMPL_DIR, "customer.html")
 
 
 # ─────────────────────────────────────────────────────────

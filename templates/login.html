@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizCRM — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & ROOT ─────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--bg2:#18181b;--bg3:#27272a;
+  --card:rgba(24, 24, 27, 0.6);
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+  --text:#fafafa;--text2:#a1a1aa;--text3:#71717a;
+  --accent:#6366f1;--accent2:#818cf8;--accent-glow:rgba(99, 102, 241, 0.3);
+  --cyan:#06b6d4;--cyan-glow:rgba(6, 182, 212, 0.3);
+  --radius:20px;
+  --shadow:0 16px 40px -8px rgba(0,0,0,.5);
+  --transition:.3s cubic-bezier(.4,0,.2,1);
+  --font-head:'Plus Jakarta Sans',sans-serif;--font-body:'Inter',sans-serif;
+}
+body{
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background-image: 
+    radial-gradient(circle at 20% 40%, rgba(99, 102, 241, 0.15), transparent 30%), 
+    radial-gradient(circle at 80% 60%, rgba(6, 182, 212, 0.12), transparent 30%);
+}
+
+/* ─── LOGIN CONTAINER ──────────────────────────── */
+.login-wrapper {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  animation: fadeUp 0.6s ease both;
+}
+@keyframes fadeUp {from{opacity:0; transform:translateY(24px)} to{opacity:1; transform:translateY(0)}}
+
+.login-card {
+  background: var(--card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px 32px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.login-card::before {
+  content:'';position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--accent),var(--cyan));
+}
+
+/* ─── BRAND ────────────────────────────────────── */
+.brand {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.brand-icon {
+  width: 54px; height: 54px;
+  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 12px 24px var(--accent-glow);
+  margin-bottom: 16px;
+}
+.brand-title {
+  font-family: var(--font-head);
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.brand-subtitle {
+  font-size: 0.9rem;
+  color: var(--text2);
+  margin-top: 6px;
+}
+
+/* ─── TABS ─────────────────────────────────────── */
+.tabs {
+  display: flex;
+  background: rgba(0,0,0,0.2);
+  padding: 6px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+}
+.tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--transition);
+}
+.tab.active {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* ─── FORMS ────────────────────────────────────── */
+.form-container { display: none; animation: fadeIn 0.4s ease; }
+.form-container.active { display: block; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+
+.form-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text2);
+}
+.form-control {
+  width: 100%;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  outline: none;
+}
+.form-control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+  background: rgba(0,0,0,0.4);
+}
+.form-control::placeholder {
+  color: var(--text3);
+}
+
+/* ─── BUTTONS ──────────────────────────────────── */
+.btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: var(--font-body);
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 20px var(--accent-glow);
+}
+.btn-primary:hover {
+  background: var(--accent2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+}
+
+.extras {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  font-size: 0.85rem;
+}
+.extras a {
+  color: var(--cyan);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition);
+}
+.extras a:hover {
+  color: #fff;
+}
+</style>
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card">
+    
+    <div class="brand">
+      <div class="brand-icon">🏪</div>
+      <div class="brand-title">BizCRM</div>
+      <div class="brand-subtitle">Smart Local Business Dashboard</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('admin')">Admin / Staff</div>
+      <div class="tab" onclick="switchTab('customer')">Customer Portal</div>
+    </div>
+
+    <!-- ADMIN FORM -->
+    <div id="form-admin" class="form-container active">
+      <div class="form-group">
+        <label for="admin-email">Email Address</label>
+        <input type="email" id="admin-email" class="form-control" placeholder="admin@bizcrmapp.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="admin-password">Password</label>
+        <input type="password" id="admin-password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" onclick="loginAdmin()">Sign In to Dashboard →</button>
+      <div class="extras">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text2);cursor:pointer">
+          <input type="checkbox" checked style="accent-color:var(--accent)"> Remember me
+        </label>
+        <a href="#">Forgot password?</a>
+      </div>
+    </div>
+
+    <!-- CUSTOMER FORM -->
+    <div id="form-customer" class="form-container">
+      <div class="form-group">
+        <label for="cust-email">Email Address or Phone</label>
+        <input type="text" id="cust-email" class="form-control" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="cust-code">Access PIN / OTP</label>
+        <input type="password" id="cust-code" class="form-control" placeholder="••••">
+      </div>
+      <button class="btn btn-primary" onclick="loginCustomer()" style="background:var(--cyan);box-shadow:0 6px 20px var(--cyan-glow)">Access Portal →</button>
+      <div class="extras" style="justify-content:center">
+        <a href="#" style="color:var(--text2)">Request new access PIN</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchTab(type) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
+  
+  if (type === 'admin') {
+    document.querySelectorAll('.tab')[0].classList.add('active');
+    document.getElementById('form-admin').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab')[1].classList.add('active');
+    document.getElementById('form-customer').classList.add('active');
+  }
+}
+
+function loginAdmin() {
+  const email = document.getElementById('admin-email').value;
+  const password = document.getElementById('admin-password').value;
+  
+  if(!email || !password) {
+    alert("Please enter both email and password.");
+    return;
+  }
+  
+  // Example frontend validation feedback; replace with real backend fetch
+  const btn = document.querySelector('#form-admin .btn');
+  const ogText = btn.innerHTML;
+  btn.innerHTML = 'Authenticating...';
+  
+  setTimeout(() => {
+    // For demo purposes, redirecting directly to the dashboard
+    window.location.href = '/';
+  }, 800);
+}
+
+function loginCustomer() {
+  const emailOrPhone = document.getElementById('cust-email').value.trim();
+  const pin = document.getElementById('cust-code').value.trim();
+
+  if (!emailOrPhone || !pin) {
+    alert("Please enter your email and PIN.");
+    return;
+  }
+
+  if (pin.length < 4) {
+    alert("PIN must be at least 4 characters.");
+    return;
+  }
+
+  const btn = document.querySelector('#form-customer .btn');
+  const ogText = btn.innerHTML;
+  btn.innerHTML = 'Verifying...';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    // Create a customer session with the provided details
+    const name = emailOrPhone.includes('@')
+      ? emailOrPhone.split('@')[0].replace(/[^a-zA-Z ]/g, ' ').trim()
+      : 'Customer';
+    const session = {
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      email: emailOrPhone.includes('@') ? emailOrPhone : '',
+      phone: emailOrPhone.includes('@') ? '' : emailOrPhone,
+      address: '',
+      total_spent: 0,
+      order_count: 0
+    };
+    localStorage.setItem('customer_session', JSON.stringify(session));
+    window.location.href = '/customer';
+  }, 700);
+}
+</script>
+
+</body>
+</html>

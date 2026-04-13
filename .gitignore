@@ -1,0 +1,18 @@
+# Environment variables (contains secrets)
+.env
+.env.*
+
+# SQLite database
+instance/
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# VS Code
+.vscode/
