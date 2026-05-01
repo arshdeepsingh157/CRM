@@ -465,11 +465,23 @@ select.form-control{cursor:pointer}
   .chart-grid{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   #chat-window{width:calc(100vw - 40px);right:20px}
+  .topbar .search-box{display:none}
+  .modal{max-width:calc(100vw - 32px)}
+  .modal-body{padding:20px}
+  .modal-header{padding:16px 20px}
+  .table-card>div:not(.table-header){overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:520px}
+  .page-title{font-size:1.5rem}
 }
 @media(max-width:480px){
   .stat-grid{grid-template-columns:1fr}
   .topbar{padding:12px 16px}
   .content{padding:16px}
+  .topbar-title{font-size:1rem}
+  .page-title{font-size:1.25rem}
+  .page-header{margin-bottom:20px}
+  .customer-grid{grid-template-columns:1fr}
+  .product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
 }
 
 /* ─── SECTION PAGE HEADER ─────────────────────── */
@@ -527,10 +539,10 @@ select.form-control{cursor:pointer}
   </nav>
   <div class="sidebar-footer">
     <div class="user-card" style="margin-bottom:12px;">
-      <div class="user-avatar">A</div>
+      <div class="user-avatar" id="admin-avatar">A</div>
       <div class="user-info">
-        <div class="user-name">Admin User</div>
-        <div class="user-role">Administrator</div>
+        <div class="user-name" id="admin-display-name">Admin User</div>
+        <div class="user-role" id="admin-display-role">Administrator</div>
       </div>
     </div>
     <button class="btn btn-secondary" style="width: 100%; border-color: rgba(244,63,94,.3); color: var(--red); background: rgba(244,63,94,.05)" onclick="logout()">
@@ -991,6 +1003,27 @@ const DB_DEFAULTS = {
 const _saved = localStorage.getItem('bizcrmDB');
 const DB = _saved ? JSON.parse(_saved) : JSON.parse(JSON.stringify(DB_DEFAULTS));
 
+// ─── AUTH GUARD ────────────────────────────────────────
+// Redirect to login if no admin token
+(function checkAuth() {
+  const token = localStorage.getItem('admin_token');
+  if (!token) { window.location.href = '/login'; }
+  // Populate sidebar user info from stored admin user
+  const user = JSON.parse(localStorage.getItem('admin_user') || 'null');
+  if (user) {
+    const name = user.username || user.email || 'Admin';
+    const initials = name.slice(0, 1).toUpperCase();
+    document.addEventListener('DOMContentLoaded', () => {
+      const av = document.getElementById('admin-avatar');
+      const dn = document.getElementById('admin-display-name');
+      const dr = document.getElementById('admin-display-role');
+      if (av) av.textContent = initials;
+      if (dn) dn.textContent = name;
+      if (dr) dr.textContent = (user.role || 'admin').charAt(0).toUpperCase() + (user.role || 'admin').slice(1);
+    });
+  }
+})();
+
 function saveDB(){
   localStorage.setItem('bizcrmDB', JSON.stringify(DB));
 }
@@ -1037,8 +1070,9 @@ function showConfirm(title, message, btnText, callback){
   const newBtn=btn.cloneNode(true);
   btn.parentNode.replaceChild(newBtn,btn);
   newBtn.addEventListener('click',()=>{
+    const cb = confirmCallback;  // capture before closeConfirmModal clears it
     closeConfirmModal();
-    if(confirmCallback)confirmCallback();
+    if(cb) cb();
   });
 }
 function closeConfirmModal(){
@@ -1071,7 +1105,8 @@ function navigate(el){
   closeSidebar();
 }
 function logout() {
-  localStorage.removeItem('token');
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_user');
   window.location.href = '/login';
 }
 function toggleSidebar(){

@@ -8,6 +8,7 @@
 <style>
 /* ─── RESET & ROOT ─────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* PLACEHOLDER_FULL_REWRITE */
 :root{
   --bg:#09090b;--bg2:#18181b;--bg3:#27272a;
   --card:rgba(24, 24, 27, 0.6);
@@ -28,7 +29,8 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-  overflow:hidden;
+  overflow-x:hidden;
+  overflow-y:auto;
   background-image: 
     radial-gradient(circle at 20% 40%, rgba(99, 102, 241, 0.15), transparent 30%), 
     radial-gradient(circle at 80% 60%, rgba(6, 182, 212, 0.12), transparent 30%);
@@ -192,6 +194,33 @@ body{
 .extras a:hover {
   color: #fff;
 }
+
+/* ─── RESPONSIVE ───────────────────────────────── */
+@media(max-width:520px){
+  body{align-items:flex-start;padding:24px 0 40px}
+  .login-wrapper{padding:16px}
+  .login-card{padding:28px 20px;border-radius:16px}
+  .brand{margin-bottom:20px}
+  .brand-icon{width:46px;height:46px;font-size:1.3rem;margin-bottom:12px}
+  .brand-title{font-size:1.35rem}
+  .brand-subtitle{font-size:.8rem;margin-top:4px}
+  .tabs{margin-bottom:18px}
+  .tab{padding:8px 6px;font-size:.82rem}
+  .form-group{margin-bottom:14px}
+  .form-group label{font-size:.8rem;margin-bottom:6px}
+  .form-control{padding:11px 13px;font-size:.9rem}
+  .btn{padding:12px;font-size:.9rem;margin-top:8px}
+  .extras{margin-top:18px}
+}
+@media(max-width:360px){
+  .login-card{padding:22px 14px}
+  .brand-title{font-size:1.2rem}
+  .form-control{padding:10px 12px}
+}
+/* Handle short viewport — register form has 4 fields */
+@media(max-height:700px){
+  body{align-items:flex-start;padding:20px 0 36px}
+}
 </style>
 </head>
 <body>
@@ -213,36 +242,63 @@ body{
 
     <!-- ADMIN FORM -->
     <div id="form-admin" class="form-container active">
+      <div id="admin-error" style="display:none;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:10px;padding:10px 14px;font-size:.84rem;color:#f87171;margin-bottom:14px"></div>
       <div class="form-group">
         <label for="admin-email">Email Address</label>
-        <input type="email" id="admin-email" class="form-control" placeholder="admin@bizcrmapp.com" autocomplete="email">
+        <input type="email" id="admin-email" class="form-control" placeholder="admin@crm.com" autocomplete="email" value="admin@crm.com">
       </div>
       <div class="form-group">
         <label for="admin-password">Password</label>
         <input type="password" id="admin-password" class="form-control" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <button class="btn btn-primary" onclick="loginAdmin()">Sign In to Dashboard →</button>
+      <button class="btn btn-primary" id="admin-btn" onclick="loginAdmin()">Sign In to Dashboard →</button>
       <div class="extras">
-        <label style="display:flex;align-items:center;gap:6px;color:var(--text2);cursor:pointer">
-          <input type="checkbox" checked style="accent-color:var(--accent)"> Remember me
-        </label>
-        <a href="#">Forgot password?</a>
+        <span style="color:var(--text3);font-size:.8rem">Use admin@crm.com / Admin@1234</span>
       </div>
     </div>
 
     <!-- CUSTOMER FORM -->
     <div id="form-customer" class="form-container">
-      <div class="form-group">
-        <label for="cust-email">Email Address or Phone</label>
-        <input type="text" id="cust-email" class="form-control" placeholder="you@example.com">
+      <!-- Sub-tabs: Login / Register -->
+      <div style="display:flex;background:rgba(0,0,0,.15);padding:4px;border-radius:10px;margin-bottom:18px;border:1px solid var(--border)">
+        <div id="ctab-login" style="flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;background:rgba(255,255,255,.06);color:var(--text)" onclick="switchCTab('login')">Login</div>
+        <div id="ctab-register" style="flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--text2)" onclick="switchCTab('register')">Register</div>
       </div>
-      <div class="form-group">
-        <label for="cust-code">Access PIN / OTP</label>
-        <input type="password" id="cust-code" class="form-control" placeholder="••••">
+
+      <!-- Customer Login -->
+      <div id="cust-login-form">
+        <div id="cust-error" style="display:none;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:10px;padding:10px 14px;font-size:.84rem;color:#f87171;margin-bottom:14px"></div>
+        <div class="form-group">
+          <label for="cust-email">Email Address</label>
+          <input type="email" id="cust-email" class="form-control" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="cust-password">Password</label>
+          <input type="password" id="cust-password" class="form-control" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary" id="cust-login-btn" onclick="loginCustomer()" style="background:var(--cyan);box-shadow:0 6px 20px var(--cyan-glow)">Access Portal →</button>
       </div>
-      <button class="btn btn-primary" onclick="loginCustomer()" style="background:var(--cyan);box-shadow:0 6px 20px var(--cyan-glow)">Access Portal →</button>
-      <div class="extras" style="justify-content:center">
-        <a href="#" style="color:var(--text2)">Request new access PIN</a>
+
+      <!-- Customer Register -->
+      <div id="cust-register-form" style="display:none">
+        <div id="reg-error" style="display:none;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:10px;padding:10px 14px;font-size:.84rem;color:#f87171;margin-bottom:14px"></div>
+        <div class="form-group">
+          <label for="reg-name">Full Name</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="Your Full Name">
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email Address</label>
+          <input type="email" id="reg-email" class="form-control" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label for="reg-phone">Phone (optional)</label>
+          <input type="tel" id="reg-phone" class="form-control" placeholder="+91 99999 99999">
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" class="form-control" placeholder="Min 6 characters">
+        </div>
+        <button class="btn btn-primary" id="reg-btn" onclick="registerCustomer()" style="background:var(--cyan);box-shadow:0 6px 20px var(--cyan-glow)">Create Account →</button>
       </div>
     </div>
 
@@ -250,10 +306,21 @@ body{
 </div>
 
 <script>
+// Check for ?portal=customer in URL to auto-switch tab
+if (new URLSearchParams(location.search).get('portal') === 'customer') {
+  document.addEventListener('DOMContentLoaded', () => switchTab('customer'));
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideErr(id) { document.getElementById(id).style.display = 'none'; }
+
 function switchTab(type) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
-  
   if (type === 'admin') {
     document.querySelectorAll('.tab')[0].classList.add('active');
     document.getElementById('form-admin').classList.add('active');
@@ -263,62 +330,120 @@ function switchTab(type) {
   }
 }
 
-function loginAdmin() {
-  const email = document.getElementById('admin-email').value;
+function switchCTab(tab) {
+  if (tab === 'login') {
+    document.getElementById('ctab-login').style.cssText = 'flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;background:rgba(255,255,255,.06);color:var(--text)';
+    document.getElementById('ctab-register').style.cssText = 'flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--text2)';
+    document.getElementById('cust-login-form').style.display = '';
+    document.getElementById('cust-register-form').style.display = 'none';
+  } else {
+    document.getElementById('ctab-login').style.cssText = 'flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--text2)';
+    document.getElementById('ctab-register').style.cssText = 'flex:1;text-align:center;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;background:rgba(255,255,255,.06);color:var(--text)';
+    document.getElementById('cust-login-form').style.display = 'none';
+    document.getElementById('cust-register-form').style.display = '';
+  }
+}
+
+async function loginAdmin() {
+  const email    = document.getElementById('admin-email').value.trim();
   const password = document.getElementById('admin-password').value;
-  
-  if(!email || !password) {
-    alert("Please enter both email and password.");
-    return;
+  hideErr('admin-error');
+  if (!email || !password) { showErr('admin-error', 'Please enter email and password.'); return; }
+  const btn = document.getElementById('admin-btn');
+  btn.innerHTML = '⏳ Authenticating…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      localStorage.setItem('admin_token', data.data.token);
+      localStorage.setItem('admin_user',  JSON.stringify(data.data.user));
+      window.location.href = '/';
+    } else {
+      showErr('admin-error', data.message || 'Invalid credentials. Try admin@crm.com / Admin@1234');
+    }
+  } catch(e) {
+    showErr('admin-error', 'Connection error. Is the server running?');
   }
-  
-  // Example frontend validation feedback; replace with real backend fetch
-  const btn = document.querySelector('#form-admin .btn');
-  const ogText = btn.innerHTML;
-  btn.innerHTML = 'Authenticating...';
-  
-  setTimeout(() => {
-    // For demo purposes, redirecting directly to the dashboard
-    window.location.href = '/';
-  }, 800);
+  btn.innerHTML = 'Sign In to Dashboard →'; btn.disabled = false;
 }
 
-function loginCustomer() {
-  const emailOrPhone = document.getElementById('cust-email').value.trim();
-  const pin = document.getElementById('cust-code').value.trim();
-
-  if (!emailOrPhone || !pin) {
-    alert("Please enter your email and PIN.");
-    return;
+async function loginCustomer() {
+  const email    = document.getElementById('cust-email').value.trim();
+  const password = document.getElementById('cust-password').value;
+  hideErr('cust-error');
+  if (!email || !password) { showErr('cust-error', 'Please enter email and password.'); return; }
+  const btn = document.getElementById('cust-login-btn');
+  btn.innerHTML = '⏳ Verifying…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/customer/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      localStorage.setItem('customer_token', data.data.token);
+      localStorage.setItem('customer_user',  JSON.stringify(data.data.user));
+      window.location.href = '/customer';
+    } else {
+      showErr('cust-error', data.message || 'Invalid email or password.');
+    }
+  } catch(e) {
+    showErr('cust-error', 'Connection error. Is the server running?');
   }
-
-  if (pin.length < 4) {
-    alert("PIN must be at least 4 characters.");
-    return;
-  }
-
-  const btn = document.querySelector('#form-customer .btn');
-  const ogText = btn.innerHTML;
-  btn.innerHTML = 'Verifying...';
-  btn.disabled = true;
-
-  setTimeout(() => {
-    // Create a customer session with the provided details
-    const name = emailOrPhone.includes('@')
-      ? emailOrPhone.split('@')[0].replace(/[^a-zA-Z ]/g, ' ').trim()
-      : 'Customer';
-    const session = {
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      email: emailOrPhone.includes('@') ? emailOrPhone : '',
-      phone: emailOrPhone.includes('@') ? '' : emailOrPhone,
-      address: '',
-      total_spent: 0,
-      order_count: 0
-    };
-    localStorage.setItem('customer_session', JSON.stringify(session));
-    window.location.href = '/customer';
-  }, 700);
+  btn.innerHTML = 'Access Portal →'; btn.disabled = false;
 }
+
+async function registerCustomer() {
+  const name     = document.getElementById('reg-name').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const phone    = document.getElementById('reg-phone').value.trim();
+  const password = document.getElementById('reg-password').value;
+  hideErr('reg-error');
+  if (!name)     { showErr('reg-error', 'Full name is required.'); return; }
+  if (!email)    { showErr('reg-error', 'Email is required.'); return; }
+  if (!password || password.length < 6) { showErr('reg-error', 'Password must be at least 6 characters.'); return; }
+  const btn = document.getElementById('reg-btn');
+  btn.innerHTML = '⏳ Creating Account…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/customer/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      localStorage.setItem('customer_token', data.data.token);
+      localStorage.setItem('customer_user',  JSON.stringify(data.data.user));
+      window.location.href = '/customer';
+    } else {
+      showErr('reg-error', data.message || 'Registration failed.');
+    }
+  } catch(e) {
+    showErr('reg-error', 'Connection error. Is the server running?');
+  }
+  btn.innerHTML = 'Create Account →'; btn.disabled = false;
+}
+
+// Allow Enter key submission
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const adminActive = document.getElementById('form-admin').classList.contains('active');
+  const custActive  = document.getElementById('form-customer').classList.contains('active');
+  if (adminActive) loginAdmin();
+  else if (custActive) {
+    const regVisible = document.getElementById('cust-register-form').style.display !== 'none';
+    if (regVisible) registerCustomer(); else loginCustomer();
+  }
+});
+
+// Redirect if already logged in
+if (localStorage.getItem('admin_token'))    window.location.href = '/';
+if (localStorage.getItem('customer_token')) window.location.href = '/customer';
 </script>
 
 </body>

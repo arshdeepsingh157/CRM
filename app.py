@@ -1,23 +1,25 @@
 """
 Smart Local Business Cloud CRM — Flask Backend
 ================================================
-Tech: Flask + SQLite (swap DB_URI for RDS in production)
-Auth: JWT (replace with AWS Cognito in production)
-AWS: S3 for images, Lambda stub for AI insights
+Tech: Flask + MySQL (AWS RDS compatible)
+Auth: JWT
+DB:   mysql+pymysql — configure DATABASE_URL in .env
 
-Run:
-    pip install flask flask-cors flask-sqlalchemy flask-jwt-extended
+Run (development):
+    pip install flask flask-cors flask-sqlalchemy flask-jwt-extended pymysql python-dotenv
+    # Create MySQL database first: CREATE DATABASE bizcrmdb;
     python app.py
 
-Environment Variables (create a .env file):
-    SECRET_KEY=your-secret-key-here
-    DATABASE_URL=sqlite:///bizcrmdb.db          # dev
-    # DATABASE_URL=mysql+pymysql://user:pass@rds-endpoint/bizcrmdb  # prod
+Environment Variables (.env file):
+    SECRET_KEY=your-secret-key
+    JWT_SECRET_KEY=your-jwt-secret
+    DATABASE_URL=mysql+pymysql://user:pass@localhost:3306/bizcrmdb
+    # AWS RDS:
+    # DATABASE_URL=mysql+pymysql://admin:pass@your-rds-endpoint.rds.amazonaws.com:3306/bizcrmdb
     AWS_ACCESS_KEY_ID=your-key
     AWS_SECRET_ACCESS_KEY=your-secret
     AWS_REGION=ap-south-1
     S3_BUCKET=bizcrmapp-images
-    JWT_SECRET_KEY=your-jwt-secret
 """
 
 import os
@@ -26,11 +28,14 @@ import hashlib
 import datetime
 from functools import wraps
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import (
-    JWTManager, create_access_token, jwt_required, get_jwt_identity
+    JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 )
 
 # ─────────────────────────────────────────────────────────
@@ -44,9 +49,16 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 app.config["SECRET_KEY"]                      = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 app.config["JWT_SECRET_KEY"]                  = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-me")
-app.config["SQLALCHEMY_DATABASE_URI"]         = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'instance', 'bizcrmdb.db')}")
+app.config["SQLALCHEMY_DATABASE_URI"]         = os.getenv("DATABASE_URL", "mysql+pymysql://root:password@localhost:3306/bizcrmdb")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"]  = False
 app.config["JWT_ACCESS_TOKEN_EXPIRES"]        = datetime.timedelta(hours=12)
+# Connection pool settings — essential for AWS RDS (handles dropped idle connections)
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 280,      # recycle connections before MySQL's wait_timeout (default 300s)
+    "pool_pre_ping": True,    # test connection before use, reconnect if stale
+    "pool_size": 5,
+    "max_overflow": 10,
+}
 
 db  = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -74,6 +86,30 @@ class User(db.Model):
         return {"id": self.id, "username": self.username,
                 "email": self.email, "role": self.role,
                 "created_at": str(self.created_at)}
+
+
+class CustomerUser(db.Model):
+    __tablename__ = "customer_users"
+    id            = db.Column(db.Integer, primary_key=True)
+    name          = db.Column(db.String(120), nullable=False)
+    email         = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    phone         = db.Column(db.String(20),  default="")
+    address       = db.Column(db.String(200), default="")
+    customer_id   = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True)
+    joined        = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    customer      = db.relationship("Customer", backref=db.backref("portal_user", uselist=False))
+
+    def set_password(self, pw):
+        self.password_hash = hashlib.sha256(pw.encode()).hexdigest()
+
+    def check_password(self, pw):
+        return self.password_hash == hashlib.sha256(pw.encode()).hexdigest()
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "email": self.email,
+                "phone": self.phone, "address": self.address,
+                "customer_id": self.customer_id, "joined": str(self.joined)}
 
 
 class Customer(db.Model):
@@ -135,7 +171,7 @@ class Sale(db.Model):
     __tablename__ = "sales"
     id          = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=False)
-    product_id  = db.Column(db.Integer, db.ForeignKey("products.id"),  nullable=False)
+    product_id  = db.Column(db.Integer, db.ForeignKey("products.id"),  nullable=True)
     qty         = db.Column(db.Integer, nullable=False)
     unit_price  = db.Column(db.Float,   nullable=False)
     total       = db.Column(db.Float,   nullable=False)
@@ -171,6 +207,23 @@ class InventoryLog(db.Model):
                 "note": self.note, "logged_at": str(self.logged_at)}
 
 
+class SupportTicket(db.Model):
+    __tablename__ = "support_tickets"
+    id               = db.Column(db.Integer, primary_key=True)
+    customer_user_id = db.Column(db.Integer, db.ForeignKey("customer_users.id"), nullable=True)
+    name             = db.Column(db.String(120))
+    email            = db.Column(db.String(120))
+    subject          = db.Column(db.String(200))
+    message          = db.Column(db.Text)
+    status           = db.Column(db.String(20), default="open")
+    created_at       = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "email": self.email,
+                "subject": self.subject, "message": self.message,
+                "status": self.status, "created_at": str(self.created_at)}
+
+
 # ─────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────
@@ -180,10 +233,28 @@ def admin_required(fn):
     @wraps(fn)
     @jwt_required()
     def wrapper(*args, **kwargs):
-        uid  = get_jwt_identity()
+        claims = get_jwt()
+        if claims.get("type") == "customer":
+            return jsonify({"error": "Admin access required"}), 403
+        uid  = int(get_jwt_identity())
         user = User.query.get(uid)
         if not user or user.role != "admin":
             return jsonify({"error": "Admin access required"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def customer_required(fn):
+    """Decorator: requires customer JWT."""
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        claims = get_jwt()
+        if claims.get("type") != "customer":
+            return jsonify({"error": "Customer access required"}), 403
+        cu = CustomerUser.query.get(int(get_jwt_identity()))
+        if not cu:
+            return jsonify({"error": "Customer not found"}), 404
         return fn(*args, **kwargs)
     return wrapper
 
@@ -238,7 +309,7 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id))
     return success({"token": token, "user": user.to_dict()}, "Registered successfully", 201)
 
 
@@ -251,15 +322,269 @@ def login():
     if not user or not user.check_password(data.get("password", "")):
         return error("Invalid credentials", 401)
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id), additional_claims={"type": "admin", "role": user.role})
     return success({"token": token, "user": user.to_dict()}, "Login successful")
 
 
 @app.route("/api/auth/me", methods=["GET"])
 @jwt_required()
 def get_me():
-    user = User.query.get(get_jwt_identity())
+    user = User.query.get(int(get_jwt_identity()))
     return success(user.to_dict())
+
+
+# ─────────────────────────────────────────────────────────
+# CUSTOMER PORTAL AUTH ENDPOINTS
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/customer/register", methods=["POST"])
+def customer_register():
+    """POST /api/customer/register  { name, email, password, phone?, address? }"""
+    data = request.get_json() or {}
+    if not data.get("name") or not data.get("email") or not data.get("password"):
+        return error("name, email and password are required")
+
+    email = data["email"].strip().lower()
+    if CustomerUser.query.filter_by(email=email).first():
+        return error("Email already registered", 409)
+
+    # Create portal user
+    cu = CustomerUser(
+        name=data["name"].strip(),
+        email=email,
+        phone=data.get("phone", "").strip(),
+        address=data.get("address", "").strip()
+    )
+    cu.set_password(data["password"])
+    db.session.add(cu)
+    db.session.flush()
+
+    # Create corresponding Customer record for admin visibility
+    parts = cu.name.split(" ", 1)
+    fname = parts[0]
+    lname = parts[1] if len(parts) > 1 else ""
+    cust = Customer(fname=fname, lname=lname, email=email,
+                    phone=cu.phone, address=cu.address)
+    db.session.add(cust)
+    db.session.flush()
+    cu.customer_id = cust.id
+    db.session.commit()
+
+    token = create_access_token(identity=str(cu.id), additional_claims={"type": "customer"})
+    return success({"token": token, "user": cu.to_dict()}, "Registered successfully", 201)
+
+
+@app.route("/api/customer/login", methods=["POST"])
+def customer_login():
+    """POST /api/customer/login  { email, password }"""
+    data = request.get_json() or {}
+    cu = CustomerUser.query.filter_by(email=data.get("email", "").strip().lower()).first()
+
+    if not cu or not cu.check_password(data.get("password", "")):
+        return error("Invalid email or password", 401)
+
+    token = create_access_token(identity=str(cu.id), additional_claims={"type": "customer"})
+    return success({"token": token, "user": cu.to_dict()}, "Login successful")
+
+
+@app.route("/api/customer/me", methods=["GET"])
+@customer_required
+def get_customer_me():
+    cu = CustomerUser.query.get(int(get_jwt_identity()))
+    data = cu.to_dict()
+    if cu.customer:
+        data["total_spent"] = cu.customer.total_spent
+        data["loyalty_tier"] = cu.customer.loyalty_tier()
+        data["loyalty_score"] = cu.customer.loyalty_score()
+        data["visits"] = cu.customer.visits
+    return success(data)
+
+
+@app.route("/api/customer/me", methods=["PUT"])
+@customer_required
+def update_customer_me():
+    cu   = CustomerUser.query.get(int(get_jwt_identity()))
+    data = request.get_json() or {}
+    if "name" in data and data["name"].strip():
+        cu.name = data["name"].strip()
+        if cu.customer:
+            parts = cu.name.split(" ", 1)
+            cu.customer.fname = parts[0]
+            cu.customer.lname = parts[1] if len(parts) > 1 else ""
+    if "phone" in data:
+        cu.phone = data["phone"].strip()
+        if cu.customer:
+            cu.customer.phone = cu.phone
+    if "address" in data:
+        cu.address = data["address"].strip()
+        if cu.customer:
+            cu.customer.address = cu.address
+    db.session.commit()
+    return success(cu.to_dict(), "Profile updated")
+
+
+@app.route("/api/customer/me", methods=["DELETE"])
+@customer_required
+def delete_customer_me():
+    """DELETE requires { password } in body for verification."""
+    cu   = CustomerUser.query.get(int(get_jwt_identity()))
+    data = request.get_json() or {}
+    if not cu.check_password(data.get("password", "")):
+        return error("Incorrect password", 401)
+    # Remove linked customer portal user but keep Customer record for audit
+    if cu.customer:
+        cu.customer.portal_user = None
+    db.session.delete(cu)
+    db.session.commit()
+    return success(None, "Account deleted successfully")
+
+
+@app.route("/api/customer/orders", methods=["GET"])
+@customer_required
+def get_customer_orders():
+    cu = CustomerUser.query.get(int(get_jwt_identity()))
+    if not cu or not cu.customer_id:
+        return success({"orders": []})
+    sales = Sale.query.filter_by(customer_id=cu.customer_id).order_by(Sale.sale_date.desc()).all()
+    return success({"orders": [s.to_dict() for s in sales]})
+
+
+@app.route("/api/customer/orders", methods=["POST"])
+@customer_required
+def create_customer_order():
+    """POST /api/customer/orders { items:[{product_id,qty}], address, method }"""
+    cu   = CustomerUser.query.get(int(get_jwt_identity()))
+    data = request.get_json() or {}
+
+    if not cu or not cu.customer_id:
+        return error("Customer account not fully set up", 400)
+
+    items   = data.get("items", [])
+    address = data.get("address", "").strip()
+    method  = data.get("method", "UPI")
+
+    if not items:
+        return error("No items in order")
+
+    customer = Customer.query.get(cu.customer_id)
+    created  = []
+    total_order = 0
+
+    for item in items:
+        product = Product.query.get(item.get("product_id"))
+        if not product:
+            continue
+        qty = max(1, int(item.get("qty", 1)))
+        if product.stock < qty:
+            return error(f"Insufficient stock for {product.name}. Available: {product.stock}", 422)
+
+        total = product.price * qty
+        sale  = Sale(
+            customer_id=cu.customer_id,
+            product_id=product.id,
+            qty=qty,
+            unit_price=product.price,
+            total=total,
+            method=method,
+            sale_date=datetime.date.today()
+        )
+        db.session.add(sale)
+        product.stock -= qty
+        product.sold  += qty
+        _log_inventory(product.id, "sale", -qty, f"Customer portal order")
+        created.append(sale)
+        total_order += total
+
+    if customer:
+        customer.total_spent += total_order
+        customer.visits      += 1
+
+    if customer and address:
+        customer.address = address
+        cu.address = address
+
+    db.session.commit()
+    return success({"orders": [s.to_dict() for s in created], "total": total_order}, "Order placed", 201)
+
+
+# ─────────────────────────────────────────────────────────
+# SUPPORT TICKETS
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/support/ticket", methods=["POST"])
+@jwt_required()
+def create_support_ticket():
+    """POST /api/support/ticket { subject, message, name?, email? }"""
+    data    = request.get_json() or {}
+    claims  = get_jwt()
+    cu_id   = None
+    name    = data.get("name", "")
+    email   = data.get("email", "")
+
+    if claims.get("type") == "customer":
+        cu = CustomerUser.query.get(int(get_jwt_identity()))
+        if cu:
+            cu_id  = cu.id
+            name   = name or cu.name
+            email  = email or cu.email
+
+    if not data.get("subject") or not data.get("message"):
+        return error("subject and message are required")
+
+    ticket = SupportTicket(
+        customer_user_id=cu_id,
+        name=name,
+        email=email,
+        subject=data["subject"].strip(),
+        message=data["message"].strip()
+    )
+    db.session.add(ticket)
+    db.session.commit()
+    return success(ticket.to_dict(), "Ticket submitted", 201)
+
+
+# ─────────────────────────────────────────────────────────
+# DEMO PAYMENT GATEWAY
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/payment/process", methods=["POST"])
+@customer_required
+def process_payment():
+    """POST /api/payment/process { method, amount, card_last4?, upi_id? }
+    Demo payment — always succeeds for non-zero amounts."""
+    data   = request.get_json() or {}
+    amount = float(data.get("amount", 0))
+    method = data.get("method", "UPI")
+
+    if amount <= 0:
+        return error("Invalid payment amount")
+
+    # Demo: simulate payment
+    transaction_id = f"TXN{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}{int(get_jwt_identity())}"
+    return success({
+        "status":         "success",
+        "transaction_id": transaction_id,
+        "amount":         amount,
+        "method":         method,
+        "message":        f"Payment of ₹{amount:,.2f} via {method} successful"
+    }, "Payment processed")
+
+
+# ─────────────────────────────────────────────────────────
+# ADMIN — CUSTOMER PURCHASE DETAILS
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/admin/customers/<int:cid>/purchases", methods=["GET"])
+@admin_required
+def get_customer_purchases(cid):
+    c = Customer.query.get_or_404(cid)
+    sales = Sale.query.filter_by(customer_id=cid).order_by(Sale.sale_date.desc()).all()
+    return success({
+        "customer":  c.to_dict(),
+        "purchases": [s.to_dict() for s in sales],
+        "total_spent": c.total_spent,
+        "order_count": len(sales)
+    })
 
 
 # ─────────────────────────────────────────────────────────
@@ -324,7 +649,7 @@ def create_customer():
         email=data["email"].strip().lower(),
         phone=data.get("phone", ""),
         address=data.get("address", ""),
-        created_by=get_jwt_identity()
+        created_by=int(get_jwt_identity())
     )
     db.session.add(c)
     db.session.commit()
@@ -443,6 +768,9 @@ def restock_product(pid):
 @admin_required
 def delete_product(pid):
     p = Product.query.get_or_404(pid)
+    InventoryLog.query.filter_by(product_id=pid).delete()
+    Sale.query.filter_by(product_id=pid).update({"product_id": None})
+    db.session.flush()
     db.session.delete(p)
     db.session.commit()
     return success(None, "Product deleted")
@@ -519,7 +847,7 @@ def create_sale():
         total=total,
         method=data.get("method", "Cash"),
         sale_date=data.get("sale_date") or datetime.date.today(),
-        created_by=get_jwt_identity()
+        created_by=int(get_jwt_identity())
     )
     db.session.add(sale)
 
@@ -869,12 +1197,15 @@ def seed_database():
 
     print("🌱 Seeding database...")
 
-    # Admin user
+    # Admin user (bizcrmapp)
     admin = User(username="admin", email="admin@bizcrmapp.com", role="admin")
     admin.set_password("Admin@1234")
+    # Admin user (crm)
+    admin_crm = User(username="admin_crm", email="admin@crm.com", role="admin")
+    admin_crm.set_password("Admin@1234")
     staff = User(username="staff1", email="staff@bizcrmapp.com", role="staff")
     staff.set_password("Staff@1234")
-    db.session.add_all([admin, staff])
+    db.session.add_all([admin, admin_crm, staff])
     db.session.flush()
 
     # Customers
@@ -936,6 +1267,7 @@ def seed_database():
 
     db.session.commit()
     print("✅ Database seeded successfully!")
+    print("   Admin:  admin@crm.com / Admin@1234")
     print("   Admin:  admin@bizcrmapp.com / Admin@1234")
     print("   Staff:  staff@bizcrmapp.com / Staff@1234")
 
